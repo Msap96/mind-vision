@@ -45,7 +45,7 @@
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
  
-    --primary: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 47.4% 11.2%;
  
     --secondary: 217.2 32.6% 17.5%;
@@ -80,20 +80,17 @@
 }
 
 .card-hover {
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  @apply transition-all duration-200;
 }
 
 .card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  @apply transform -translate-y-0.5 shadow-lg;
 }
 
 .timer-display {
-  font-size: 2.5rem;
-  font-weight: 700;
-  color: theme('colors.primary.600');
+  @apply text-4xl font-bold;
 }
 
 .progress-bar {
-  transition: width 1s linear;
+  @apply transition-all duration-1000 ease-linear;
 }

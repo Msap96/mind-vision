@@ -13,6 +13,43 @@ export default function Home() {
   const [timeRemaining, setTimeRemaining] = useState<number>(600);
   const [journalEntry, setJournalEntry] = useState<string>("");
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
+  const [userId, setUserId] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+
+  // Initialize user and load entries
+  useEffect(() => {
+    const initializeUser = async () => {
+      try {
+        const response = await fetch("/api/setup", {
+          method: "POST",
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to initialize user");
+        }
+
+        const { data } = await response.json();
+        setUserId(data.userId);
+
+        // Load entries for the user
+        const entriesResponse = await fetch(
+          `/api/entries?userId=${data.userId}`
+        );
+        if (!entriesResponse.ok) {
+          throw new Error("Failed to load entries");
+        }
+
+        const { data: entriesData } = await entriesResponse.json();
+        setJournalEntries(entriesData);
+      } catch (error) {
+        console.error("Error initializing:", error);
+        setError("Failed to initialize application");
+      }
+    };
+
+    initializeUser();
+  }, []);
 
   const exercises: Exercise[] = [
     {
@@ -88,39 +125,75 @@ export default function Home() {
     setJournalEntry("");
   };
 
-  const handleSaveJournal = (): void => {
-    if (journalEntry.trim()) {
-      setJournalEntries((prev) => [
-        ...prev,
-        {
-          date: new Date().toLocaleString(),
-          exercise: currentEx.title,
-          entry: journalEntry,
+  const handleSaveJournal = async (): Promise<void> => {
+    if (!journalEntry.trim() || !userId) return;
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/entries", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      ]);
+        body: JSON.stringify({
+          date: new Date().toISOString(),
+          exercise: currentEx.title,
+          content: journalEntry,
+          userId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save entry");
+      }
+
+      const { data: newEntry } = await response.json();
+      setJournalEntries((prev) => [newEntry, ...prev]);
       setJournalEntry("");
+    } catch (error) {
+      console.error("Error saving journal entry:", error);
+      setError(error instanceof Error ? error.message : "Failed to save entry");
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-4">Error</h2>
+          <p className="text-gray-600">{error}</p>
+          <Button className="mt-4" onClick={() => window.location.reload()}>
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <main className="min-h-screen mind-vision-gradient p-4 sm:p-6 md:p-8">
+    <main className="min-h-screen bg-gradient-to-br from-background via-muted/50 to-background p-4 sm:p-6 md:p-8 transition-colors">
       <div className="max-w-2xl mx-auto space-y-6">
-        <Card className="card-hover shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-primary-100 to-primary-50 rounded-t-lg">
-            <CardTitle className="text-3xl font-bold text-primary-700">
+        <Card className="card-hover">
+          <CardHeader className="bg-gradient-to-r from-primary/10 to-background rounded-t-lg dark:from-primary/5">
+            <CardTitle className="text-3xl font-bold text-primary">
               MindVision
             </CardTitle>
           </CardHeader>
           <CardContent className="p-6">
             <div className="space-y-6">
-              <div className="bg-primary-50 rounded-lg p-6 shadow-inner">
-                <h2 className="text-xl font-semibold mb-2 text-primary-700">
+              <div className="bg-muted rounded-lg p-6">
+                <h2 className="text-xl font-semibold mb-2 text-primary">
                   {currentEx.title}
                 </h2>
-                <p className="text-gray-600 mb-4 leading-relaxed">
+                <p className="text-muted-foreground mb-4 leading-relaxed">
                   {currentEx.description}
                 </p>
-                <div className="flex items-center justify-between text-sm text-primary-600">
+                <div className="flex items-center justify-between text-sm text-primary/80">
                   <span className="flex items-center">
                     <span className="mr-2">⏱️</span>
                     Duration: {formatTime(currentEx.duration)}
@@ -132,23 +205,18 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="timer-display text-center">
+              <div className="timer-display text-center text-primary">
                 {formatTime(timeRemaining)}
               </div>
 
               <div className="flex items-center justify-center space-x-6">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="hover:bg-primary-50 transition-colors"
-                  onClick={handlePrevious}
-                >
-                  <SkipBack className="h-5 w-5 text-primary-600" />
+                <Button variant="outline" size="icon" onClick={handlePrevious}>
+                  <SkipBack className="h-5 w-5" />
                 </Button>
 
                 <Button
                   size="icon"
-                  className="bg-primary-600 hover:bg-primary-700 transition-colors w-12 h-12"
+                  className="w-12 h-12"
                   onClick={() => setIsPlaying(!isPlaying)}
                 >
                   {isPlaying ? (
@@ -158,19 +226,14 @@ export default function Home() {
                   )}
                 </Button>
 
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="hover:bg-primary-50 transition-colors"
-                  onClick={handleNext}
-                >
-                  <SkipForward className="h-5 w-5 text-primary-600" />
+                <Button variant="outline" size="icon" onClick={handleNext}>
+                  <SkipForward className="h-5 w-5" />
                 </Button>
               </div>
 
-              <div className="w-full bg-gray-200 rounded-full h-3">
+              <div className="w-full bg-muted rounded-full h-3">
                 <div
-                  className="bg-primary-600 h-3 rounded-full progress-bar"
+                  className="bg-primary h-3 rounded-full progress-bar"
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -178,9 +241,9 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        <Card className="journal-card card-hover shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-primary-50 to-white">
-            <CardTitle className="text-2xl text-primary-700">
+        <Card className="card-hover">
+          <CardHeader className="bg-gradient-to-r from-primary/10 to-background dark:from-primary/5">
+            <CardTitle className="text-2xl text-primary">
               Reflection Journal
             </CardTitle>
           </CardHeader>
@@ -188,32 +251,44 @@ export default function Home() {
             <div className="space-y-4">
               <div className="space-y-2">
                 {currentEx.prompts.map((prompt, index) => (
-                  <p key={index} className="text-gray-600 italic">
+                  <p key={index} className="text-muted-foreground italic">
                     "{prompt}"
                   </p>
                 ))}
               </div>
               <textarea
-                className="w-full h-32 p-3 border rounded-lg focus:ring-2 focus:ring-primary-400 focus:border-primary-400 transition-shadow"
+                className="w-full h-32 p-3 rounded-lg bg-muted border-muted-foreground/20 focus:ring-2 focus:ring-primary focus:border-primary transition-shadow resize-none"
                 placeholder="Record your experience..."
                 value={journalEntry}
                 onChange={(e) => setJournalEntry(e.target.value)}
+                disabled={isLoading}
               />
               <Button
-                className="w-full bg-primary-600 hover:bg-primary-700 transition-colors"
+                className="w-full"
                 onClick={handleSaveJournal}
+                disabled={isLoading || !journalEntry.trim()}
               >
-                <Save className="h-4 w-4 mr-2" />
-                Save Entry
+                {isLoading ? (
+                  <span className="flex items-center">
+                    <span className="animate-spin mr-2">⌛</span>
+                    Saving...
+                  </span>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Entry
+                  </>
+                )}
               </Button>
+              {error && <p className="text-sm text-red-500 mt-2">{error}</p>}
             </div>
           </CardContent>
         </Card>
 
         {journalEntries.length > 0 && (
-          <Card className="journal-card card-hover shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-primary-50 to-white">
-              <CardTitle className="text-2xl text-primary-700">
+          <Card className="card-hover">
+            <CardHeader className="bg-gradient-to-r from-primary/10 to-background dark:from-primary/5">
+              <CardTitle className="text-2xl text-primary">
                 Previous Entries
               </CardTitle>
             </CardHeader>
@@ -222,12 +297,12 @@ export default function Home() {
                 {journalEntries.map((entry, index) => (
                   <div
                     key={index}
-                    className="border-b pb-4 hover:bg-primary-50 p-3 rounded-lg transition-colors"
+                    className="border-b border-border pb-4 hover:bg-muted p-3 rounded-lg transition-colors"
                   >
-                    <div className="text-sm text-primary-600">
+                    <div className="text-sm text-primary/80">
                       {entry.date} - {entry.exercise}
                     </div>
-                    <p className="mt-2 text-gray-700">{entry.entry}</p>
+                    <p className="mt-2 text-foreground">{entry.content}</p>
                   </div>
                 ))}
               </div>

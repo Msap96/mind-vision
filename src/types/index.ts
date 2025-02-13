@@ -7,7 +7,16 @@ export interface Exercise {
 }
 
 export interface JournalEntry {
+  id: string;
   date: string;
   exercise: string;
-  entry: string;
+  content: string;
+  userId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ApiResponse<T> {
+  data?: T;
+  error?: string;
 } 
