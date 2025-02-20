@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Play, Pause, SkipBack, SkipForward, Save } from "lucide-react";
+import { Play, Pause, SkipBack, SkipForward, Save, Trash2 } from "lucide-react";
 import type { Exercise, JournalEntry } from "@/types";
 
 export default function Home() {
@@ -161,6 +161,38 @@ export default function Home() {
     }
   };
 
+  const handleDeleteEntry = async (entryId: string): Promise<void> => {
+    if (!userId) return;
+
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/entries/${entryId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete entry");
+      }
+
+      // Remove the deleted entry from the state
+      setJournalEntries((prev) => prev.filter((entry) => entry.id !== entryId));
+    } catch (error) {
+      console.error("Error deleting journal entry:", error);
+      setError(
+        error instanceof Error ? error.message : "Failed to delete entry"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -299,10 +331,23 @@ export default function Home() {
                     key={index}
                     className="border-b border-border pb-4 hover:bg-muted p-3 rounded-lg transition-colors"
                   >
-                    <div className="text-sm text-primary/80">
-                      {entry.date} - {entry.exercise}
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="text-sm text-primary/80">
+                          {entry.date} - {entry.exercise}
+                        </div>
+                        <p className="mt-2 text-foreground">{entry.content}</p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteEntry(entry.id)}
+                        disabled={isLoading}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <p className="mt-2 text-foreground">{entry.content}</p>
                   </div>
                 ))}
               </div>
